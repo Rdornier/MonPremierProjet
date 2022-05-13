@@ -14,9 +14,11 @@ import org.scijava.command.Command;
 import org.scijava.command.CommandService;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
+import ch.epfl.biop.ij2command.Rois2MeasurementMap;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,6 +34,9 @@ public class WorkflowPCB2 implements Command{
 
     @Parameter
     Boolean showImage = false;
+
+    @Parameter
+    CommandService cds;
 
     @Override
     public void run() {
@@ -56,17 +61,27 @@ public class WorkflowPCB2 implements Command{
 
         // Create output folder
         String resultFolderpath = create_Folder(imp,"output_java");
+        try {
         for (int i = 1; i <= imp.getNChannels(); i++) {
             imp.setPosition(i,1,1);
             rm.runCommand(imp,"Measure");
             ImagePlus ch_imp = new Duplicator().run(imp,i,i,1,1,1,1);
             // from the ROIs get the Area measurement map
-            ImagePlus mean_imp = R2M(ch_imp,"Mean",rm);
-            //ImagePlus mean_imp = cds.run(Rois2MeasurementMap, false , "imp" , ch_imp , "rm", rm, "column_name", "Mean").get().getOutput("results_imp");
+            //ImagePlus mean_imp = R2M(ch_imp,"Mean",rm);
+            ImagePlus mean_imp = null;
+
+            mean_imp = (ImagePlus) cds.run(Rois2MeasurementMap.class, false , "imp" , ch_imp , "rm", rm, "column_name", "Mean").get().getOutput("results_imp");
+
             mean_imp.setTitle("c"+i+"_"+ imp.getTitle());
             IJ.saveAsTiff(mean_imp,resultFolderpath+ File.separator +mean_imp.getTitle());
             IJ.saveAs(rt.getTitle(),resultFolderpath+ File.separator +mean_imp.getTitle()+"_Table.csv");
             rt.reset();
+        }
+
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
         }
     }
 
@@ -119,7 +134,7 @@ public class WorkflowPCB2 implements Command{
         return output_path;
     }
 
-    private ImagePlus R2M(ImagePlus imp, String column_name, RoiManager rm){
+    /*private ImagePlus R2M(ImagePlus imp, String column_name, RoiManager rm){
         // duplicate the imp for the task
         ImagePlus imp2 = imp.duplicate();
         String pattern = "Track-(\\d*):.*";
@@ -237,5 +252,5 @@ public class WorkflowPCB2 implements Command{
         imp2.setTitle(column_name +"_Image");
         imp2.setRoi(0,0, imp2.getWidth(),imp2.getHeight() );
         return imp2;
-    }
+    }*/
 }
